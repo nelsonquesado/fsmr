@@ -1,0 +1,30 @@
+url: https://nelsonquesado.github.io/fsmr/
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+articles:
+  - title: Vignettes
+    contents:
+      - data-objects
+      - trip-generation
+      - matrix-reaggregation
+
+navbar:
+  structure:
+    left: [home, data_objects, trip_generation, matrix_reaggregation, reference, news]
+    right: [search, github]
+  components:
+    home:
+      icon: fa-home
+      href: index.html
+    data_objects:
+      text: Data Objects
+      href: articles/data-objects.html
+    trip_generation:
+      text: Trip Generation
+      href: articles/trip-generation.html
+    matrix_reaggregation:
+      text: Matrix Re-Aggregation
+      href: articles/matrix-reaggregation.html

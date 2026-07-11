@@ -1,0 +1,202 @@
+---
+title: "Trip Generation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Trip Generation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(fsmr)
+```
+
+Trip generation estimates productions and attractions. In an OD-based model,
+observed productions are origin totals and observed attractions are destination
+totals.
+
+```{r observed-totals}
+zones <- fsm_toy_zone
+od <- fsm_toy_od
+totals <- fsm_od_totals(od, zones)
+
+totals
+summary(totals)
+plot(totals)
+```
+
+## Regression
+
+`fsm_generation()` fits production and attraction regressions independently.
+Supply one formula for a one-sided model or both formulas for a two-sided
+model. Predictions are rounded to whole trips.
+
+```{r regression}
+fit <- fsm_generation(
+  zones,
+  totals,
+  method = "regression",
+  production_formula = production ~ 0 + population,
+  attraction_formula = attraction ~ 0 + jobs
+)
+
+summary(fit)
+predict(fit)
+plot(fit)
+```
+
+Coefficient confidence intervals are available for regression fits. The
+result is a named list because production and attraction are separate models.
+
+```{r confidence-intervals}
+intervals <- confint(fit)
+intervals$production
+intervals$attraction
+```
+
+Use `newdata` to apply the fitted model elsewhere. Missing predictors produce
+`NA` only for the affected outcome. The `negative` argument controls negative
+predictions.
+
+```{r prediction-controls}
+predict(fit, zones, negative = "zero")
+predict(fit, zones, negative = "keep")
+
+production_only <- fsm_generation(
+  zones,
+  totals[, c("zone_id", "production"), with = FALSE],
+  method = "regression",
+  production_formula = production ~ 0 + population
+)
+predict(production_only, zones)
+```
+
+## Cross-Classification
+
+Cross-classification estimates separate production and attraction rates for
+each combination of user-selected attributes. Exposure columns transform those
+rates into trip totals.
+
+```{r classification}
+rate_fit <- fsm_generation(
+  zones,
+  totals,
+  method = "cross_classification",
+  cross_classification = c("area_type", "income_group"),
+  production_exposure = "households",
+  attraction_exposure = "jobs"
+)
+
+summary(rate_fit)
+predict(rate_fit, zones)
+```
+
+The fitted cells are available from the summary object.
+
+```{r classification-rates}
+summary(rate_fit)$cell_rates
+```
+
+## Growth Factors
+
+Growth factors scale observed totals. A scalar model can be stored as a
+reusable rule without data or observed totals.
+
+```{r growth}
+growth_fit <- fsm_generation(
+  zones,
+  totals,
+  method = "growth_factor",
+  growth_factor = 1.10
+)
+predict(growth_fit)
+
+reusable_growth <- fsm_generation(
+  method = "growth_factor",
+  growth_factor = 1.10
+)
+predict(reusable_growth, totals)
+```
+
+Zone-specific growth factors can change systemwide production and attraction
+by different amounts because their starting zonal distributions differ.
+
+## Custom and Externally Calibrated Models
+
+Use `custom_fit` and `custom_predict` for a model fitted inside the workflow.
+
+```{r custom}
+custom_fit <- fsm_generation(
+  zones,
+  totals,
+  method = "custom",
+  custom_fit = function(data, totals, ...) {
+    list(
+      production = mean(totals$production),
+      attraction = mean(totals$attraction)
+    )
+  },
+  custom_predict = function(object, newdata, ...) {
+    data.frame(
+      zone_id = newdata$zone_id,
+      production = object$production,
+      attraction = object$attraction
+    )
+  }
+)
+predict(custom_fit, zones)
+```
+
+For parameters calibrated outside `fsmr`, supply `custom_object` directly.
+No observed totals or dummy fitting function are needed.
+
+```{r external}
+parameters <- list(
+  production = c(intercept = 100, population = 0.04),
+  attraction = c(intercept = 50, jobs = 0.06)
+)
+
+external_fit <- fsm_generation(
+  method = "custom",
+  custom_object = parameters,
+  custom_predict = function(object, newdata, ...) {
+    data.frame(
+      zone_id = newdata$zone_id,
+      production = object$production[["intercept"]] +
+        object$production[["population"]] * newdata$population,
+      attraction = object$attraction[["intercept"]] +
+        object$attraction[["jobs"]] * newdata$jobs
+    )
+  }
+)
+predict(external_fit, zones)
+```
+
+## Trip-Level Records
+
+Trip-level generation uses `population_id` as the record identifier. The toy
+population includes individual and trip attributes, and `population_count`
+acts as the record weight.
+
+```{r trip-level}
+population_totals <- data.frame(
+  population_id = fsm_toy_population$population_id,
+  production = fsm_toy_population$population_count *
+    (1 + fsm_toy_population$employed + fsm_toy_population$vehicles),
+  attraction = fsm_toy_population$population_count *
+    (2 + 2 * fsm_toy_population$employed + fsm_toy_population$vehicles)
+)
+
+population_fit <- fsm_generation(
+  fsm_toy_population,
+  population_totals,
+  method = "regression",
+  production_formula = production ~ 0 + population_count +
+    population_count:employed + population_count:vehicles,
+  attraction_formula = attraction ~ 0 + population_count +
+    population_count:employed + population_count:vehicles
+)
+
+predict(population_fit)
+```

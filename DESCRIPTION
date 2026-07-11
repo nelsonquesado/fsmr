@@ -1,0 +1,32 @@
+Package: fsmr
+Type: Package
+Title: Trip-Based Four-Step Transport Demand Modeling in R
+Version: 0.1.0
+Authors@R: c(
+    person("Nelson de Oliveira", "Quesado Filho", email = "nquesado@gmail.com", role = c("aut", "cre")),
+    person("Francisco Moraes", "de Oliveira Neto", email = "moraes@det.ufc.br", role = "aut")
+  )
+Description: Provides data structures and modeling tools for preparing
+    zone-level, trip-level, population-level, and origin-destination demand
+    data. Implements production and attraction summaries, regression and
+    classification-rate generation models, growth-factor projections, custom
+    generation methods, matrix visualization, and matrix re-aggregation as
+    foundations for trip-based four-step transport demand modeling. Trips are
+    represented as independent choice units; trip-chaining and activity-based
+    models are outside the current scope.
+License: GPL-3
+Encoding: UTF-8
+Depends: 
+    R (>= 4.1.0)
+Imports: 
+    data.table
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0
+URL: https://nelsonquesado.github.io/fsmr/,
+    https://github.com/nelsonquesado/fsmr
+BugReports: https://github.com/nelsonquesado/fsmr/issues

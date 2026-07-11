@@ -1,0 +1,127 @@
+---
+title: "Data Objects and Trip Records"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Data Objects and Trip Records}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(fsmr)
+```
+
+`fsmr` represents the aggregate and disaggregate inputs used in a trip-based
+four-step workflow. It currently treats each origin-destination trip as an
+independent choice unit.
+
+## Origin-Destination Demand
+
+Use `fsm_od()` to standardize an OD table. Origin-destination pairs must be
+unique. Demand can be zero or missing, but observed demand must be finite and
+non-negative.
+
+```{r od}
+raw_demand <- data.frame(
+  zone_o = c(1, 1, 2, 3),
+  zone_d = c(2, 3, 1, 2),
+  trips = c(100, 50, 200, 30)
+)
+
+od <- fsm_od(raw_demand, "zone_o", "zone_d", "trips")
+od
+summary(od)
+plot(od)
+```
+
+`fsm_toy_od` is a ready-to-use OD example. It contains positive, zero, and
+missing demand observations.
+
+```{r toy-od}
+fsm_toy_od
+plot(fsm_toy_od)
+```
+
+## Zone Attributes
+
+`fsm_zone()` stores a unique zone identifier and any attributes needed by a
+model. Attribute names and types are user-defined.
+
+```{r zones}
+zone_data <- data.frame(
+  id = c(1, 2, 3),
+  residents = c(1200, 2500, 1800),
+  employment = c(400, 1300, 900),
+  school_places = c(150, 220, 80)
+)
+
+zones <- fsm_zone(zone_data, "id", od = od)
+summary(zones)
+plot(zones)
+```
+
+Supplying `od` validates that its origin and destination identifiers are known
+zones. It does not require every zone to have observed trips.
+
+## Disaggregate Population and Trip Data
+
+`fsm_population()` stores one disaggregate record per row. A record can be an
+individual or a trip carrying individual attributes. `population_count`
+represents multiple records only when every stored attribute is identical.
+
+```{r population}
+population_data <- data.frame(
+  id = 1:3,
+  people = c(2, 1, 3),
+  income = c(1800, 2400, 0),
+  employed = c(TRUE, TRUE, FALSE),
+  student = c(FALSE, TRUE, FALSE),
+  vehicles = c(TRUE, TRUE, FALSE),
+  origin = c(1, 2, 1),
+  destination = c(2, 1, 3),
+  mode = c("car", "ridehailing", "walk+transit"),
+  purpose_pair = c("home-work", "work-home", "home-health"),
+  time_of_day = c("07:30:00", "17:15:00", "12:00:00")
+)
+
+population <- fsm_population(
+  population_data,
+  population_id = "id",
+  population_count = "people"
+)
+population
+```
+
+`fsm_toy_population` uses trips as its observational unit. It keeps a
+list-column of individual identifiers when otherwise identical trip records
+are grouped. Its trip attributes include endpoints, mode, an ordered purpose
+pair, and a 24-hour clock time.
+
+```{r toy-population}
+fsm_toy_population
+summary(fsm_toy_population)
+plot(fsm_toy_population)
+```
+
+## Aggregating Trip Records
+
+Use the trip helpers to derive aggregate objects. For an `fsm_population`,
+`population_count` is used as the default trip weight.
+
+```{r trip-helpers}
+trip_od <- fsm_od_from_trips(fsm_toy_population)
+transit_od <- fsm_od_from_trips(fsm_toy_population, modes = "transit")
+trip_zones <- fsm_zone_from_trips(fsm_toy_population, include = 7L)
+trip_totals <- fsm_od_totals_from_trips(
+  fsm_toy_population,
+  zones = trip_zones
+)
+
+trip_od
+transit_od
+trip_totals
+```
+
+For a multimodal label such as `walk+transit`, filtering with `modes =
+"transit"` matches the transit component.

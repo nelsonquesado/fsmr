@@ -1,0 +1,77 @@
+---
+title: "Matrix Re-Aggregation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Matrix Re-Aggregation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(fsmr)
+```
+
+`fsm_reaggregate_matrix()` sums an origin-destination matrix into a different
+zoning system. Supply a correspondence table with one row per source zone and
+its target zone.
+
+## A Simple Correspondence
+
+```{r source-matrix}
+matrix_od <- matrix(1:16, nrow = 4)
+rownames(matrix_od) <- colnames(matrix_od) <- c("a", "b", "c", "d")
+matrix_od
+
+correspondence <- data.frame(
+  old_zone = c("a", "b", "c", "d"),
+  new_zone = c("north", "north", "south", "south")
+)
+
+fsm_reaggregate_matrix(matrix_od, correspondence)
+```
+
+The function applies the correspondence to both the origin and destination
+dimensions. In this example, the four-zone matrix becomes a two-zone matrix.
+
+## Separate Origin and Destination Correspondence
+
+Origin and destination systems can use different correspondence columns.
+
+```{r separate-correspondence}
+row_map <- data.frame(
+  source_zone = c("a", "b", "c", "d"),
+  origin_district = c("west", "west", "east", "east")
+)
+col_map <- data.frame(
+  source_zone = c("a", "b", "c", "d"),
+  destination_district = c("north", "south", "north", "south")
+)
+
+fsm_reaggregate_matrix(
+  matrix_od,
+  row_map = row_map,
+  col_map = col_map,
+  from = "source_zone",
+  to = "origin_district",
+  col_from = "source_zone",
+  col_to = "destination_district"
+)
+```
+
+Every source row and column label must have a correspondence. The resulting
+matrix preserves the total demand in the input matrix.
+
+```{r total-check}
+result <- fsm_reaggregate_matrix(matrix_od,
+  row_map = row_map,
+  col_map = col_map,
+  from = "source_zone",
+  to = "origin_district",
+  col_from = "source_zone",
+  col_to = "destination_district"
+)
+
+sum(matrix_od)
+sum(result)
+```

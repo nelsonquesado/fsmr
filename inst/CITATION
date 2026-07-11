@@ -1,0 +1,11 @@
+bibentry(
+  bibtype = "Manual",
+  title = "fsmr: Trip-Based Four-Step Transport Demand Modeling in R",
+  author = c(
+    person("Nelson de Oliveira", "Quesado Filho"),
+    person("Francisco Moraes", "de Oliveira Neto")
+  ),
+  year = "2026",
+  note = paste("R package version", meta$Version),
+  url = "https://nelsonquesado.github.io/fsmr/"
+)
