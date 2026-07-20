@@ -98,7 +98,7 @@ list-column of individual identifiers when otherwise identical trip records
 are grouped. Its trip attributes include endpoints, mode, an ordered purpose
 pair, and a 24-hour clock time.
 
-```{r toy-population}
+```{r toy-population, fig.width = 12, fig.height = 14}
 fsm_toy_population
 summary(fsm_toy_population)
 plot(fsm_toy_population)
