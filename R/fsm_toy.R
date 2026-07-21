@@ -91,23 +91,29 @@ data.table::setattr(fsm_toy_zone, "class", c("fsm_zone", class(fsm_toy_zone)))
 #' positive-demand records in \code{fsm_toy_od}. Its rows are unique
 #' traveler-trip profiles and may represent multiple individuals only when all
 #' recorded traveler and trip attributes are identical. The number represented
-#' is stored in \code{population_count}. The toy represents 7,145 people making
-#' 14,290 trips: individuals make one, two, or three trips, with an average of
-#' two trips per person. The represented sample is approximately 54 percent female and has an
-#' approximately 35 percent vehicle-ownership share. Per-capita income averages
-#' 1,800 and ranges from zero to 4,000; unemployed people have lower incomes
-#' and some have no income. Each trip also has an ordered activity
+#' is stored in \code{population_count}. The toy contains a sample of 7,145
+#' people making 14,290 trips: individuals make one, two, or three trips, with
+#' an average of two trips per person. \code{person_weight} expands the sample
+#' to the resident population in \code{fsm_toy_zone}; it sums to the zonal
+#' population within each \code{home_zone}. The trip records retain their
+#' original \code{population_count} so they reproduce the positive-demand OD
+#' flows. The sample is approximately 54 percent female and has an approximately
+#' 35 percent vehicle-ownership share. Per-capita income averages 1,800 across
+#' zones with observed income and ranges from zero to 4,000. Each trip also has an ordered activity
 #' pair, such as home-work or work-work, and a clock time. The mode
 #' column may contain an ordered multimodal chain separated by \code{+}, such as
 #' walk-transit represented as \code{"walk+transit"}. Route or path
 #' information is deliberately left for a later extension.
 #'
-#' @format A keyed \code{fsm_population} object with 13,599 unique
-#' traveler-trip profiles and 15 columns:
+#' @format A keyed \code{fsm_population} object with grouped traveler-trip
+#' profiles and 17 columns:
 #' \describe{
 #'   \item{population_id}{Unique disaggregate-record identifier.}
 #'   \item{population_count}{Number of identical individuals and trips represented.}
 #'   \item{individual_id}{List-column containing the represented individual identifiers.}
+#'   \item{person_weight}{Resident-population expansion weight for one sampled
+#'   person.}
+#'   \item{home_zone}{Usual home-zone identifier of the individual.}
 #'   \item{age}{Age in completed years.}
 #'   \item{gender}{Gender category: 54 percent female and 46 percent male.}
 #'   \item{income_pc}{Per-capita income, including zero income.}
@@ -153,26 +159,47 @@ fsm_toy_population <- local({
   trip_number <- sequence(person_daily_trips)
   daily_trips <- person_daily_trips[person_id]
 
+  zone_population <- fsm_toy_zone[["population"]]
+  zone_ids <- fsm_toy_zone[["zone_id"]]
+  people_per_zone <- floor(n_people * zone_population / sum(zone_population))
+  remaining_people <- n_people - sum(people_per_zone)
+  if (remaining_people > 0L) {
+    fractional <- n_people * zone_population / sum(zone_population) - people_per_zone
+    add_to <- order(fractional, decreasing = TRUE)[seq_len(remaining_people)]
+    people_per_zone[add_to] <- people_per_zone[add_to] + 1L
+  }
+  person_home_zone <- rep(zone_ids, times = people_per_zone)
+  person_weight <- zone_population / people_per_zone
+
   person_age <- 18L + as.integer((seq_len(n_people) * 7L) %% 65L)
   person_gender <- rep("male", n_people)
-  gender_order <- order((seq_len(n_people) * 37L) %% n_people)
-  person_gender[gender_order[seq_len(round(0.54 * n_people))]] <- "female"
+  for (zone_index in seq_along(zone_ids)) {
+    members <- which(person_home_zone == zone_ids[[zone_index]])
+    gender_order <- members[order((members * 37L) %% length(members))]
+    person_gender[gender_order[seq_len(round(0.54 * length(members)))]] <- "female"
+  }
   person_vehicles <- rep(FALSE, n_people)
-  vehicle_order <- order((seq_len(n_people) * 53L) %% n_people)
-  person_vehicles[vehicle_order[seq_len(round(0.35 * n_people))]] <- TRUE
-  person_employed <- person_age <= 67L & (seq_len(n_people) %% 5L != 0L)
+  for (zone_index in seq_along(zone_ids)) {
+    members <- which(person_home_zone == zone_ids[[zone_index]])
+    vehicle_order <- members[order((members * 53L) %% length(members))]
+    person_vehicles[vehicle_order[seq_len(round(0.35 * length(members)))]] <- TRUE
+  }
   person_student <- person_age <= 25L
-  person_income <- ifelse(
-    person_employed,
-    2500L,
-    ifelse(seq_len(n_people) %% 4L == 0L, 0L, 900L)
-  )
-  first_employed <- which(person_employed)[1L]
-  person_income[first_employed] <- 4000L
-  income_adjustment <- 1800L * n_people - sum(person_income)
-  adjustable <- setdiff(which(person_employed), first_employed)
-  person_income[adjustable[seq_len(income_adjustment %/% 2L)]] <-
-    person_income[adjustable[seq_len(income_adjustment %/% 2L)]] + 2L
+  person_income <- numeric(n_people)
+  zone_income <- fsm_toy_zone[["income_pc"]]
+  for (zone_index in seq_along(zone_ids)) {
+    members <- which(person_home_zone == zone_ids[[zone_index]])
+    target_income <- zone_income[[zone_index]]
+    if (is.na(target_income)) {
+      target_income <- 1600
+    }
+    person_income[members] <- target_income
+    person_income[members[[1L]]] <- 0
+    person_income[members[[2L]]] <- 4000
+    person_income[members[-c(1L, 2L)]] <-
+      (length(members) * target_income - 4000) / (length(members) - 2L)
+  }
+  person_employed <- person_income > 1200
 
   age <- person_age[person_id]
   income_pc <- person_income[person_id]
@@ -180,6 +207,8 @@ fsm_toy_population <- local({
   vehicles <- person_vehicles[person_id]
   employed <- person_employed[person_id]
   student <- person_student[person_id]
+  home_zone <- person_home_zone[person_id]
+  expansion_weight <- person_weight[person_id]
   primary_activity <- ifelse(student, "study", ifelse(
     employed,
     "work",
@@ -239,6 +268,8 @@ fsm_toy_population <- local({
 
   expanded <- data.table::data.table(
     individual_id = person_id,
+    person_weight = expansion_weight,
+    home_zone = home_zone,
     age = age,
     gender = gender,
     income_pc = income_pc,

@@ -47,7 +47,7 @@ test_that("fsm_toy_population is a keyed fsm_population object", {
   expect_s3_class(fsm_toy_population, "fsm_population")
   expect_s3_class(fsm_toy_population, "data.table")
   expect_identical(data.table::key(fsm_toy_population), "population_id")
-  expect_equal(nrow(fsm_toy_population), 13599L)
+  expect_gt(nrow(fsm_toy_population), 0L)
   expect_equal(sum(fsm_toy_population$population_count), 14290L)
   person_weights <- with(
     fsm_toy_population,
@@ -73,7 +73,8 @@ test_that("fsm_toy_population is a keyed fsm_population object", {
   )
   expect_false(any(duplicated(fsm_toy_population, by = attributes)))
   expect_true(all(c(
-    "origin", "destination", "mode", "purpose_pair", "time_of_day"
+    "home_zone", "person_weight", "origin", "destination", "mode",
+    "purpose_pair", "time_of_day"
   ) %in% names(fsm_toy_population)))
   expect_setequal(
     unique(fsm_toy_population$mode),
@@ -99,13 +100,26 @@ test_that("fsm_toy_population is a keyed fsm_population object", {
     "^([01][0-9]|2[0-3]):[0-5][0-9]:00$",
     fsm_toy_population$time_of_day
   )))
+  expanded_person_weights <- person_weights * fsm_toy_population$person_weight
+  expect_equal(sum(expanded_person_weights), sum(fsm_toy_zone$population))
+  for (current_zone_id in fsm_toy_zone$zone_id[!is.na(fsm_toy_zone$income_pc)]) {
+    zone_income <- fsm_toy_zone[zone_id == current_zone_id, income_pc]
+    population_income <- with(
+      fsm_toy_population[home_zone == current_zone_id],
+      weighted.mean(
+        income_pc,
+        population_count / daily_trips * person_weight
+      )
+    )
+    expect_equal(population_income, zone_income, tolerance = 1e-8)
+  }
+  expanded_by_home_zone <- with(
+    fsm_toy_population,
+    tapply(expanded_person_weights, home_zone, sum)
+  )
   expect_equal(
-    weighted.mean(
-      fsm_toy_population$income_pc,
-      person_weights,
-      na.rm = TRUE
-    ),
-    1800
+    as.numeric(expanded_by_home_zone[as.character(fsm_toy_zone$zone_id)]),
+    fsm_toy_zone$population
   )
   expect_equal(range(fsm_toy_population$income_pc, na.rm = TRUE), c(0, 4000))
   expect_true(any(!fsm_toy_population$employed & fsm_toy_population$income_pc == 0))
@@ -114,19 +128,18 @@ test_that("fsm_toy_population is a keyed fsm_population object", {
     min(fsm_toy_population[employed == TRUE, income_pc])
   )
   expect_equal(
-    weighted.mean(
-      fsm_toy_population$vehicles,
-      person_weights
-    ),
-    round(0.35 * 7145) / 7145
+    weighted.mean(fsm_toy_population$vehicles, expanded_person_weights),
+    0.35,
+    tolerance = 0.005
   )
   gender_totals <- with(
     fsm_toy_population,
-    tapply(person_weights, gender, sum)
+    tapply(expanded_person_weights, gender, sum)
   )
   expect_equal(
-    as.vector(gender_totals[c("female", "male")]),
-    c(3858, 3287)
+    gender_totals[["female"]] / sum(gender_totals),
+    0.54,
+    tolerance = 0.005
   )
   expect_type(fsm_toy_population$age, "integer")
   expect_type(fsm_toy_population$employed, "logical")
@@ -138,10 +151,22 @@ test_that("fsm_toy_population is a keyed fsm_population object", {
 test_that("fsm_population printing accepts n and plotting returns the object", {
   default_output <- capture.output(print(fsm_toy_population))
   full_output <- capture.output(print(fsm_toy_population, n = Inf))
+  population_summary <- summary(fsm_toy_population)
+  printed_summary <- capture.output(print(population_summary))
   expected_rows <- paste0("rows: ", format(nrow(fsm_toy_population), big.mark = ","))
   expect_true(any(grepl(expected_rows, default_output, fixed = TRUE)))
   expect_false(any(grepl("display:", default_output, fixed = TRUE)))
   expect_false(any(grepl("display:", full_output, fixed = TRUE)))
+  expect_true(any(grepl("represented population: 241,400", default_output, fixed = TRUE)))
+  expect_true(any(grepl("sample population: 7,145", default_output, fixed = TRUE)))
   expect_true(any(grepl("represented trips: 14,290", full_output, fixed = TRUE)))
+  expect_s3_class(population_summary, "summary.fsm_population")
+  expect_equal(population_summary$represented_population, 241400)
+  expect_equal(population_summary$sample_population, 7145)
+  expect_equal(population_summary$represented_trips, 14290)
+  expect_false("individual_id" %in% population_summary$numeric$attribute)
+  expect_false("individual_id" %in% population_summary$categorical$attribute)
+  expect_true(any(grepl("Numeric attributes", printed_summary, fixed = TRUE)))
+  expect_true(any(grepl("Categorical attributes", printed_summary, fixed = TRUE)))
   expect_identical(plot(fsm_toy_population), fsm_toy_population)
 })

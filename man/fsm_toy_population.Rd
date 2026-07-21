@@ -5,12 +5,15 @@
 \alias{fsm_toy_population}
 \title{Toy population trip records}
 \format{
-A keyed \code{fsm_population} object with 13,599 unique
-traveler-trip profiles and 15 columns:
+A keyed \code{fsm_population} object with grouped traveler-trip
+profiles and 17 columns:
 \describe{
   \item{population_id}{Unique disaggregate-record identifier.}
   \item{population_count}{Number of identical individuals and trips represented.}
   \item{individual_id}{List-column containing the represented individual identifiers.}
+  \item{person_weight}{Resident-population expansion weight for one sampled
+  person.}
+  \item{home_zone}{Usual home-zone identifier of the individual.}
   \item{age}{Age in completed years.}
   \item{gender}{Gender category: 54 percent female and 46 percent male.}
   \item{income_pc}{Per-capita income, including zero income.}
@@ -36,12 +39,15 @@ A deterministic disaggregate trip table aligned with the
 positive-demand records in \code{fsm_toy_od}. Its rows are unique
 traveler-trip profiles and may represent multiple individuals only when all
 recorded traveler and trip attributes are identical. The number represented
-is stored in \code{population_count}. The toy represents 7,145 people making
-14,290 trips: individuals make one, two, or three trips, with an average of
-two trips per person. The represented sample is approximately 54 percent female and has an
-approximately 35 percent vehicle-ownership share. Per-capita income averages
-1,800 and ranges from zero to 4,000; unemployed people have lower incomes
-and some have no income. Each trip also has an ordered activity
+is stored in \code{population_count}. The toy contains a sample of 7,145
+people making 14,290 trips: individuals make one, two, or three trips, with
+an average of two trips per person. \code{person_weight} expands the sample
+to the resident population in \code{fsm_toy_zone}; it sums to the zonal
+population within each \code{home_zone}. The trip records retain their
+original \code{population_count} so they reproduce the positive-demand OD
+flows. The sample is approximately 54 percent female and has an approximately
+35 percent vehicle-ownership share. Per-capita income averages 1,800 across
+zones with observed income and ranges from zero to 4,000. Each trip also has an ordered activity
 pair, such as home-work or work-work, and a clock time. The mode
 column may contain an ordered multimodal chain separated by \code{+}, such as
 walk-transit represented as \code{"walk+transit"}. Route or path

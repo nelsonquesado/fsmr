@@ -216,25 +216,221 @@ print.fsm_population <- function(x, ..., n = 6L) {
   }
 
   shown <- fsm_print_n(n, nrow(x))
+  sample_population <- fsm_population_size(x)
+  represented_population <- fsm_population_expanded_size(x)
 
   cat("<fsm_population>\n")
-  cat("  rows: ", fsm_format_number(nrow(x)), "\n", sep = "")
-  represented_label <- if (all(c("origin", "destination") %in% names(x))) {
-    "represented trips"
-  } else {
-    "represented population"
-  }
   cat(
-    "  ", represented_label, ": ",
-    fsm_format_number(sum(x[["population_count"]])),
+    "  represented population: ",
+    fsm_format_number(represented_population),
     "\n",
     sep = ""
   )
-  cat("  attributes: ", ncol(x) - 2L, "\n", sep = "")
+  if (!is.null(represented_population) && represented_population != sample_population) {
+    cat(
+      "  sample population: ",
+      fsm_format_number(sample_population),
+      "\n",
+      sep = ""
+    )
+  }
+  cat("  rows: ", fsm_format_number(nrow(x)), "\n", sep = "")
+  if (all(c("origin", "destination") %in% names(x))) {
+    cat(
+      "  represented trips: ",
+      fsm_format_number(sum(x[["population_count"]])),
+      "\n",
+      sep = ""
+    )
+  }
+  cat("  attributes: ", length(fsm_population_attribute_names(x)), "\n", sep = "")
   cat("  key: ", paste(data.table::key(x), collapse = ", "), "\n", sep = "")
   cat("\n")
 
   print(utils::head(data.table::as.data.table(x), shown), ...)
+  invisible(x)
+}
+
+fsm_population_size <- function(x) {
+  if ("individual_id" %in% names(x) && is.list(x[["individual_id"]])) {
+    identifiers <- unlist(x[["individual_id"]], recursive = TRUE, use.names = FALSE)
+    if (length(identifiers) > 0L && !anyNA(identifiers)) {
+      return(length(unique(identifiers)))
+    }
+  }
+
+  if ("daily_trips" %in% names(x)) {
+    daily_trips <- x[["daily_trips"]]
+    valid_daily_trips <- is.numeric(daily_trips) &&
+      length(daily_trips) == nrow(x) &&
+      all(is.finite(daily_trips)) &&
+      all(daily_trips > 0)
+    if (valid_daily_trips) {
+      return(sum(x[["population_count"]] / daily_trips))
+    }
+  }
+
+  sum(x[["population_count"]])
+}
+
+fsm_population_expanded_size <- function(x) {
+  if (!"person_weight" %in% names(x)) {
+    return(fsm_population_size(x))
+  }
+
+  weights <- x[["person_weight"]]
+  if (!is.numeric(weights) || anyNA(weights) || any(!is.finite(weights)) || any(weights <= 0)) {
+    return(fsm_population_size(x))
+  }
+
+  if ("daily_trips" %in% names(x)) {
+    daily_trips <- x[["daily_trips"]]
+    if (is.numeric(daily_trips) && length(daily_trips) == nrow(x) &&
+        all(is.finite(daily_trips)) && all(daily_trips > 0)) {
+      return(sum(x[["population_count"]] * weights / daily_trips))
+    }
+  }
+
+  sum(x[["population_count"]] * weights)
+}
+
+fsm_population_attribute_names <- function(x) {
+  identifiers <- c(
+    "population_id", "population_count", "individual_id", "person_id",
+    "trip_id", "zone_id", "home_zone", "origin", "destination"
+  )
+  setdiff(names(x), identifiers)
+}
+
+#' Summarize a Population Attribute Object
+#'
+#' @description Summarizes an \code{fsm_population} object without printing its
+#' identifiers or list columns as attributes. Numeric attributes are described
+#' with count-weighted statistics. Categorical and logical attributes report
+#' their number of observed values and missing records.
+#'
+#' @param object An \code{fsm_population} object.
+#' @param ... Unused.
+#'
+#' @return An object of class \code{summary.fsm_population} containing object
+#' metadata and tables for numeric and categorical attributes.
+#' @export
+summary.fsm_population <- function(object, ...) {
+  if (missing(object)) {
+    stop("`object` must be supplied.", call. = FALSE)
+  }
+  if (!inherits(object, "fsm_population")) {
+    stop("`object` must be an `fsm_population` object.", call. = FALSE)
+  }
+
+  attributes <- fsm_population_attribute_names(object)
+  numeric_attributes <- attributes[vapply(
+    object[, attributes, with = FALSE],
+    is.numeric,
+    logical(1)
+  )]
+  categorical_attributes <- setdiff(attributes, numeric_attributes)
+  categorical_attributes <- categorical_attributes[!vapply(
+    object[, categorical_attributes, with = FALSE],
+    is.list,
+    logical(1)
+  )]
+  weights <- object[["population_count"]]
+
+  numeric_statistics <- data.frame(
+    attribute = numeric_attributes,
+    mean = numeric(length(numeric_attributes)),
+    sd = numeric(length(numeric_attributes)),
+    min = numeric(length(numeric_attributes)),
+    max = numeric(length(numeric_attributes)),
+    missing = integer(length(numeric_attributes))
+  )
+  for (index in seq_along(numeric_attributes)) {
+    values <- object[[numeric_attributes[[index]]]]
+    observed <- !is.na(values)
+    numeric_statistics$missing[[index]] <- sum(!observed)
+    if (!any(observed)) {
+      numeric_statistics[index, c("mean", "sd", "min", "max")] <- NA_real_
+      next
+    }
+    observed_weights <- weights[observed]
+    observed_values <- values[observed]
+    attribute_mean <- stats::weighted.mean(observed_values, observed_weights)
+    numeric_statistics$mean[[index]] <- attribute_mean
+    numeric_statistics$sd[[index]] <- sqrt(sum(
+      observed_weights * (observed_values - attribute_mean)^2
+    ) / sum(observed_weights))
+    numeric_statistics$min[[index]] <- min(observed_values)
+    numeric_statistics$max[[index]] <- max(observed_values)
+  }
+
+  categorical_statistics <- data.frame(
+    attribute = categorical_attributes,
+    values = integer(length(categorical_attributes)),
+    missing = integer(length(categorical_attributes))
+  )
+  for (index in seq_along(categorical_attributes)) {
+    values <- object[[categorical_attributes[[index]]]]
+    observed <- !is.na(values)
+    categorical_statistics$values[[index]] <- length(unique(values[observed]))
+    categorical_statistics$missing[[index]] <- sum(!observed)
+  }
+
+  out <- list(
+    rows = nrow(object),
+    represented_population = fsm_population_expanded_size(object),
+    sample_population = fsm_population_size(object),
+    represented_trips = if (all(c("origin", "destination") %in% names(object))) {
+      sum(weights)
+    } else {
+      NULL
+    },
+    n_attributes = length(attributes),
+    key = data.table::key(object),
+    numeric = numeric_statistics,
+    categorical = categorical_statistics
+  )
+  class(out) <- "summary.fsm_population"
+  out
+}
+
+#' Print a Population Attribute Summary
+#'
+#' @param x A \code{summary.fsm_population} object.
+#' @param ... Unused.
+#'
+#' @return Invisibly returns \code{x}.
+#' @export
+print.summary.fsm_population <- function(x, ...) {
+  if (missing(x)) {
+    stop("`x` must be supplied.", call. = FALSE)
+  }
+
+  cat("<summary.fsm_population>\n")
+  cat("  represented population: ", fsm_format_number(x$represented_population), "\n", sep = "")
+  if (x$represented_population != x$sample_population) {
+    cat("  sample population: ", fsm_format_number(x$sample_population), "\n", sep = "")
+  }
+  if (!is.null(x$represented_trips)) {
+    cat("  represented trips: ", fsm_format_number(x$represented_trips), "\n", sep = "")
+  }
+  cat("  rows: ", fsm_format_number(x$rows), "\n", sep = "")
+  cat("  attributes: ", x$n_attributes, "\n", sep = "")
+  cat("  key: ", paste(x$key, collapse = ", "), "\n", sep = "")
+
+  cat("\nNumeric attributes\n")
+  if (nrow(x$numeric) == 0L) {
+    cat("  none\n")
+  } else {
+    print(x$numeric, row.names = FALSE, digits = 4)
+  }
+
+  cat("\nCategorical attributes\n")
+  if (nrow(x$categorical) == 0L) {
+    cat("  none\n")
+  } else {
+    print(x$categorical, row.names = FALSE)
+  }
   invisible(x)
 }
 

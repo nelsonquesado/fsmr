@@ -62,7 +62,7 @@ citation("fsmr")
 }
 ```
 
-## Acknowledgement <img align="right" src="figs/logo_ufc.png?raw=true" alt="Universidade Federal do Ceará" height="120"> <a href="https://det.ufc.br/petran"><img align="right" src="figs/opatp.png?raw=true" alt="OPA-TP" width="120"></a>
+## Acknowledgement <img align="right" src="man/figures/logo_ufc.png" alt="Universidade Federal do Ceará" height="120"> <a href="https://det.ufc.br/petran"><img align="right" src="man/figures/opatp.png" alt="OPA-TP" width="120"></a>
 
 **fsmr** is developed by [Nelson Quesado](https://github.com/nelsonquesado/)
 and [Fco. Moraes](https://github.com/orgs/OPATP/people/OliveiraNetoFM) at the

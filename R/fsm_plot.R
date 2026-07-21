@@ -186,7 +186,11 @@ plot.fsm_zone <- function(x, ...) {
   n_panels <- length(numeric_cols)
   n_cols <- ceiling(sqrt(n_panels))
   n_rows <- ceiling(n_panels / n_cols)
-  graphics::par(mfrow = c(n_rows, n_cols), mar = c(3.5, 4, 2, 1) + 0.1)
+  graphics::par(
+    mfrow = c(n_rows, n_cols),
+    mar = c(4.8, 4.5, 2.5, 1) + 0.1,
+    mgp = c(2.8, 0.8, 0)
+  )
 
   for (panel_index in seq_along(numeric_cols)) {
     col_name <- numeric_cols[[panel_index]]
@@ -293,7 +297,7 @@ plot.fsm_population <- function(x, ...) {
       ""
     }
 
-    categorical_ids <- c("zone_id", "origin", "destination")
+    categorical_ids <- c("zone_id", "home_zone", "origin", "destination")
     if (is.numeric(values) && !attribute %in% categorical_ids) {
       graphics::par(mar = c(3.5, 4, 2.5, 1) + 0.1)
       observed <- !is.na(values)
