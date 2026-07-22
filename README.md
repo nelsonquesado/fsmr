@@ -8,8 +8,8 @@
 ![License: GPL-3](https://img.shields.io/badge/license-GPL--3-blue.svg)
 
 `fsmr` provides objects and tools for trip-based four-step transport demand
-modeling. Current coverage includes OD demand, zones, disaggregate trip
-records, trip generation, and matrix re-aggregation.
+modeling. Current coverage includes OD demand, zones, origin-destination
+survey trips, trip generation, and matrix re-aggregation.
 
 ## Installation
 
@@ -39,7 +39,7 @@ confint(fit)
 plot(od)
 ```
 
-Toy objects: `fsm_toy_od`, `fsm_toy_zone`, and `fsm_toy_population`.
+Toy objects: `fsm_toy_od`, `fsm_toy_zone`, and `fsm_toy_trip`.
 
 ## Guides
 

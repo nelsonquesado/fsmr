@@ -8,13 +8,13 @@
 #' Person identifiers may link records, but this aggregation does not model
 #' dependencies among trips in a chain.
 #'
-#' @param data A data.frame, data.table, list, or \code{fsm_population}
+#' @param data A data.frame, data.table, list, or \code{fsm_trip}
 #' containing trip records.
 #' @param origins Character string naming the origin-zone column.
 #' @param destinations Character string naming the destination-zone column.
 #' @param weights Optional character string naming a finite, non-negative
-#' numeric trip-weight column. For an \code{fsm_population}, the default uses
-#' \code{population_count}; for other inputs, each row has weight one.
+#' numeric trip-weight column. For an \code{fsm_trip}, the default uses
+#' \code{expansion_factor} when present; otherwise each row has weight one.
 #' @param modes Optional vector of mode values to retain before aggregation.
 #' A value matches either a complete mode-chain label or any component of a
 #' chain separated by \code{+}; for example, \code{"transit"} matches both
@@ -33,8 +33,8 @@
 #' aggregation into origin-destination flows.
 #'
 #' @examples
-#' od <- fsm_od_from_trips(fsm_toy_population)
-#' car_od <- fsm_od_from_trips(fsm_toy_population, modes = "car")
+#' od <- fsm_od_from_trips(fsm_toy_trip)
+#' car_od <- fsm_od_from_trips(fsm_toy_trip, modes = "car")
 fsm_od_from_trips <- function(
   data,
   origins = "origin",
@@ -79,8 +79,8 @@ fsm_od_from_trips <- function(
 
   trips <- data.table::as.data.table(data.table::copy(data))
   required <- c(origins, destinations)
-  if (is.null(weights) && inherits(data, "fsm_population")) {
-    weights <- "population_count"
+  if (is.null(weights) && inherits(data, "fsm_trip") && "expansion_factor" %in% names(trips)) {
+    weights <- "expansion_factor"
   }
   if (!is.null(weights)) {
     required <- c(required, weights)
@@ -159,7 +159,7 @@ fsm_trip_mode_match <- function(trip_modes, modes) {
 #' @export
 #'
 #' @examples
-#' fsm_od_totals_from_trips(fsm_toy_population, zones = fsm_toy_zone)
+#' fsm_od_totals_from_trips(fsm_toy_trip, zones = fsm_toy_zone)
 fsm_od_totals_from_trips <- function(
   data,
   origins = "origin",
@@ -198,8 +198,8 @@ fsm_od_totals_from_trips <- function(
 #' @export
 #'
 #' @examples
-#' fsm_zone_from_trips(fsm_toy_population)
-#' fsm_zone_from_trips(fsm_toy_population, include = 7L)
+#' fsm_zone_from_trips(fsm_toy_trip)
+#' fsm_zone_from_trips(fsm_toy_trip, include = 7L)
 fsm_zone_from_trips <- function(
   data,
   origins = "origin",

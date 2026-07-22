@@ -213,10 +213,12 @@ plot.fsm_zone <- function(x, ...) {
   invisible(x)
 }
 
-#' Plot Population Attributes
+#' Plot Origin-Destination Survey Attributes
 #'
-#' @description Plots count-weighted distributions for the attributes in an
-#' \code{fsm_population} object according to column class. Numeric and
+#' @description Plots weighted distributions for the attributes in an
+#' \code{fsm_trip} object according to column class. When present,
+#' \code{expansion_factor} supplies the trip weights; otherwise each record
+#' has unit weight. Numeric and
 #' integer attributes are shown as weighted histograms. Character, factor,
 #' ordered, and logical attributes are shown as weighted bars. Character times
 #' in \code{HH:MM:SS} format are shown as weighted numeric histograms.
@@ -225,7 +227,7 @@ plot.fsm_zone <- function(x, ...) {
 #' are shown as weighted bar plots. Record and person identifiers are not
 #' plotted as attributes.
 #'
-#' @param x An \code{fsm_population} object.
+#' @param x An \code{fsm_trip} object.
 #' @param ... Additional graphical arguments passed to \code{graphics::plot()}
 #' for numeric attributes and \code{graphics::barplot()} for categorical
 #' attributes.
@@ -234,21 +236,21 @@ plot.fsm_zone <- function(x, ...) {
 #' @export
 #'
 #' @examples
-#' plot(fsm_toy_population)
-plot.fsm_population <- function(x, ...) {
+#' plot(fsm_toy_trip)
+plot.fsm_trip <- function(x, ...) {
   if (missing(x)) {
     stop("`x` must be supplied.", call. = FALSE)
   }
-  if (!inherits(x, "fsm_population")) {
-    stop("`x` must be an `fsm_population` object.", call. = FALSE)
+  if (!inherits(x, "fsm_trip")) {
+    stop("`x` must be an `fsm_trip` object.", call. = FALSE)
   }
 
   attribute_cols <- setdiff(
     names(x),
-    c("population_id", "population_count", "individual_id", "trip_id", "person_id")
+    c("trip_id", "individual_id", "person_id", "expansion_factor")
   )
   if (length(attribute_cols) == 0L) {
-    stop("`x` must contain at least one population attribute to plot.", call. = FALSE)
+    stop("`x` must contain at least one trip attribute to plot.", call. = FALSE)
   }
 
   supported <- vapply(attribute_cols, function(attribute) {
@@ -259,7 +261,7 @@ plot.fsm_population <- function(x, ...) {
   unsupported <- attribute_cols[!supported]
   if (length(unsupported)) {
     warning(
-      "Unsupported population attribute class; skipped column(s): ",
+      "Unsupported trip attribute class; skipped column(s): ",
       paste(unsupported, collapse = ", "),
       ".",
       call. = FALSE
@@ -267,7 +269,7 @@ plot.fsm_population <- function(x, ...) {
   }
   attribute_cols <- attribute_cols[supported]
   if (length(attribute_cols) == 0L) {
-    stop("`x` has no supported population attributes to plot.", call. = FALSE)
+    stop("`x` has no supported trip attributes to plot.", call. = FALSE)
   }
 
   old_par <- graphics::par(no.readonly = TRUE)
@@ -277,10 +279,10 @@ plot.fsm_population <- function(x, ...) {
   n_rows <- ceiling(n_panels / n_cols)
   graphics::par(mfrow = c(n_rows, n_cols))
 
-  counts <- x[["population_count"]]
-  trip_records <- all(c("origin", "destination") %in% names(x))
+  trip_weights <- fsm_trip_weights(x)
   for (panel_index in seq_along(attribute_cols)) {
     attribute <- attribute_cols[[panel_index]]
+    weights <- trip_weights
     values <- x[[attribute]]
     observed_time <- !is.na(values)
     if (is.character(values) && any(observed_time) && all(grepl(
@@ -292,7 +294,7 @@ plot.fsm_population <- function(x, ...) {
         as.numeric(substr(values, 7L, 8L)) / 3600
     }
     y_label <- if ((panel_index - 1L) %% n_cols == 0L) {
-      if (trip_records) "Represented trips" else "Represented population"
+      "Represented trips"
     } else {
       ""
     }
@@ -316,7 +318,7 @@ plot.fsm_population <- function(x, ...) {
         labels = FALSE
       )
       bin_counts <- numeric(length(histogram$counts))
-      weighted_bins <- tapply(counts[observed], bins, sum)
+      weighted_bins <- tapply(weights[observed], bins, sum)
       bin_counts[as.integer(names(weighted_bins))] <- weighted_bins
       histogram$counts <- bin_counts
       histogram$density <- bin_counts / sum(bin_counts) / diff(histogram$breaks)
@@ -331,7 +333,7 @@ plot.fsm_population <- function(x, ...) {
         ...
       )
 
-      missing_count <- sum(counts[is.na(values)])
+      missing_count <- sum(weights[is.na(values)])
       if (missing_count > 0) {
         graphics::mtext(
           paste0("Missing: ", fsm_format_number(missing_count)),
@@ -343,7 +345,7 @@ plot.fsm_population <- function(x, ...) {
       }
     } else {
       labels <- ifelse(is.na(values), "Missing", as.character(values))
-      represented <- tapply(counts, labels, sum)
+      represented <- tapply(weights, labels, sum)
       bottom_margin <- min(9, max(5, 2.5 + 0.35 * max(nchar(names(represented)))))
       graphics::par(mar = c(bottom_margin, 4, 2.5, 1) + 0.1)
       graphics::barplot(
@@ -367,10 +369,10 @@ plot.fsm_population <- function(x, ...) {
 #'
 #' @description Plots the available production and attraction predictions from
 #' a fitted \code{fsm_generation} object against its stored training data or
-#' new zonal, population-level, or trip-level data.
+#' new zonal or trip-level data.
 #'
 #' @param x An \code{fsm_generation} object.
-#' @param newdata Optional zonal, population-level, or trip-level data used to generate
+#' @param newdata Optional zonal or trip-level data used to generate
 #' predictions. If omitted, the training data stored in \code{x} are used.
 #' @param negative Character string controlling negative predictions. See
 #' \code{predict.fsm_generation()}.
@@ -423,7 +425,7 @@ plot.fsm_generation <- function(
     names.arg = pred[[id_col]],
     col = colors,
     border = NA,
-    xlab = if (identical(id_col, "zone_id")) "Zone" else "Population record",
+    xlab = if (identical(id_col, "zone_id")) "Zone" else "Trip record",
     ylab = "Trips",
     legend.text = labels,
     args.legend = list(x = "topright", bty = "n"),

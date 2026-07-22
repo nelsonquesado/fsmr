@@ -7,7 +7,7 @@ Authors@R: c(
     person("Francisco Moraes", "de Oliveira Neto", email = "moraes@det.ufc.br", role = "aut")
   )
 Description: Provides data structures and modeling tools for preparing
-    zone-level, trip-level, population-level, and origin-destination demand
+    zone-level, origin-destination survey, and origin-destination demand
     data. Implements production and attraction summaries, regression and
     classification-rate generation models, growth-factor projections, custom
     generation methods, matrix visualization, and matrix re-aggregation as

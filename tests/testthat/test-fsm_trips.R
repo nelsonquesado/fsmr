@@ -1,7 +1,7 @@
 library(testthat)
 
 test_that("trip records reproduce positive toy OD demand", {
-  od <- fsm_od_from_trips(fsm_toy_population)
+  od <- fsm_od_from_trips(fsm_toy_trip)
   expected <- fsm_toy_od[!is.na(demand) & demand > 0]
 
   expect_s3_class(od, "fsm_od")
@@ -12,30 +12,30 @@ test_that("trip records reproduce positive toy OD demand", {
 })
 
 test_that("trip helpers filter modes and derive totals and zones", {
-  car_od <- fsm_od_from_trips(fsm_toy_population, modes = "car")
-  zones <- fsm_zone_from_trips(fsm_toy_population)
-  complete_zones <- fsm_zone_from_trips(fsm_toy_population, include = 7L)
+  car_od <- fsm_od_from_trips(fsm_toy_trip, modes = "car")
+  zones <- fsm_zone_from_trips(fsm_toy_trip)
+  complete_zones <- fsm_zone_from_trips(fsm_toy_trip, include = 7L)
   totals <- fsm_od_totals_from_trips(
-    fsm_toy_population,
+    fsm_toy_trip,
     zones = complete_zones
   )
 
   expect_equal(
     sum(car_od$demand),
     sum(vapply(
-      strsplit(fsm_toy_population$mode, "+", fixed = TRUE),
+      strsplit(fsm_toy_trip$mode, "+", fixed = TRUE),
       function(x) "car" %in% x,
       logical(1)
-    ) * fsm_toy_population$population_count)
+    ) * fsm_toy_trip$expansion_factor)
   )
-  transit_od <- fsm_od_from_trips(fsm_toy_population, modes = "transit")
+  transit_od <- fsm_od_from_trips(fsm_toy_trip, modes = "transit")
   expect_equal(
     sum(transit_od$demand),
     sum(vapply(
-      strsplit(fsm_toy_population$mode, "+", fixed = TRUE),
+      strsplit(fsm_toy_trip$mode, "+", fixed = TRUE),
       function(x) "transit" %in% x,
       logical(1)
-    ) * fsm_toy_population$population_count)
+    ) * fsm_toy_trip$expansion_factor)
   )
   expect_equal(zones$zone_id, 1:6)
   expect_equal(complete_zones$zone_id, 1:7)

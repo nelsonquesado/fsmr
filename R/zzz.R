@@ -16,7 +16,7 @@ utils::globalVariables(c(
   "production",
   "attraction",
   "zone_id",
-  "population_id",
+  "trip_id",
   "origin",
   "destination",
   "demand",

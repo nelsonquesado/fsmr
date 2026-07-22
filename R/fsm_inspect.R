@@ -200,237 +200,95 @@ print.fsm_od_totals <- function(x, ..., n = 6L) {
   invisible(x)
 }
 
-#' Print a Population Attribute Object
+#' Print an Origin-Destination Survey Object
 #'
-#' @param x An \code{fsm_population} object.
-#' @param ... Additional arguments passed to the underlying data.table print
-#' method.
-#' @param n Maximum number of disaggregate records to display. Use \code{Inf} to
-#' display every record.
+#' @param x An \code{fsm_trip} object.
+#' @param ... Additional arguments passed to the underlying data.table print method.
+#' @param n Maximum number of trip records to display. Use \code{Inf} for all records.
 #'
 #' @return Invisibly returns \code{x}.
 #' @export
-print.fsm_population <- function(x, ..., n = 6L) {
-  if (missing(x)) {
-    stop("`x` must be supplied.", call. = FALSE)
-  }
-
-  shown <- fsm_print_n(n, nrow(x))
-  sample_population <- fsm_population_size(x)
-  represented_population <- fsm_population_expanded_size(x)
-
-  cat("<fsm_population>\n")
-  cat(
-    "  represented population: ",
-    fsm_format_number(represented_population),
-    "\n",
-    sep = ""
-  )
-  if (!is.null(represented_population) && represented_population != sample_population) {
-    cat(
-      "  sample population: ",
-      fsm_format_number(sample_population),
-      "\n",
-      sep = ""
-    )
-  }
+print.fsm_trip <- function(x, ..., n = 6L) {
+  if (missing(x)) stop("`x` must be supplied.", call. = FALSE)
+  cat("<fsm_trip>\n")
+  cat("  trips: ", fsm_format_number(sum(fsm_trip_weights(x))), "\n", sep = "")
   cat("  rows: ", fsm_format_number(nrow(x)), "\n", sep = "")
-  if (all(c("origin", "destination") %in% names(x))) {
-    cat(
-      "  represented trips: ",
-      fsm_format_number(sum(x[["population_count"]])),
-      "\n",
-      sep = ""
-    )
+  if ("individual_id" %in% names(x) && !anyNA(x[["individual_id"]])) {
+    cat("  individuals: ", fsm_format_number(length(unique(x[["individual_id"]]))), "\n", sep = "")
   }
-  cat("  attributes: ", length(fsm_population_attribute_names(x)), "\n", sep = "")
-  cat("  key: ", paste(data.table::key(x), collapse = ", "), "\n", sep = "")
-  cat("\n")
-
-  print(utils::head(data.table::as.data.table(x), shown), ...)
+  cat("  attributes: ", length(fsm_trip_attribute_names(x)), "\n", sep = "")
+  cat("  key: ", paste(data.table::key(x), collapse = ", "), "\n\n", sep = "")
+  print(utils::head(data.table::as.data.table(x), fsm_print_n(n, nrow(x))), ...)
   invisible(x)
 }
 
-fsm_population_size <- function(x) {
-  if ("individual_id" %in% names(x) && is.list(x[["individual_id"]])) {
-    identifiers <- unlist(x[["individual_id"]], recursive = TRUE, use.names = FALSE)
-    if (length(identifiers) > 0L && !anyNA(identifiers)) {
-      return(length(unique(identifiers)))
-    }
-  }
-
-  if ("daily_trips" %in% names(x)) {
-    daily_trips <- x[["daily_trips"]]
-    valid_daily_trips <- is.numeric(daily_trips) &&
-      length(daily_trips) == nrow(x) &&
-      all(is.finite(daily_trips)) &&
-      all(daily_trips > 0)
-    if (valid_daily_trips) {
-      return(sum(x[["population_count"]] / daily_trips))
-    }
-  }
-
-  sum(x[["population_count"]])
+fsm_trip_weights <- function(x) {
+  if (!"expansion_factor" %in% names(x)) return(rep(1, nrow(x)))
+  x[["expansion_factor"]]
 }
 
-fsm_population_expanded_size <- function(x) {
-  if (!"person_weight" %in% names(x)) {
-    return(fsm_population_size(x))
-  }
-
-  weights <- x[["person_weight"]]
-  if (!is.numeric(weights) || anyNA(weights) || any(!is.finite(weights)) || any(weights <= 0)) {
-    return(fsm_population_size(x))
-  }
-
-  if ("daily_trips" %in% names(x)) {
-    daily_trips <- x[["daily_trips"]]
-    if (is.numeric(daily_trips) && length(daily_trips) == nrow(x) &&
-        all(is.finite(daily_trips)) && all(daily_trips > 0)) {
-      return(sum(x[["population_count"]] * weights / daily_trips))
-    }
-  }
-
-  sum(x[["population_count"]] * weights)
+fsm_trip_attribute_names <- function(x) {
+  setdiff(names(x), c("trip_id", "individual_id", "origin", "destination", "expansion_factor"))
 }
 
-fsm_population_attribute_names <- function(x) {
-  identifiers <- c(
-    "population_id", "population_count", "individual_id", "person_id",
-    "trip_id", "zone_id", "home_zone", "origin", "destination"
-  )
-  setdiff(names(x), identifiers)
-}
-
-#' Summarize a Population Attribute Object
+#' Summarize an Origin-Destination Survey Object
 #'
-#' @description Summarizes an \code{fsm_population} object without printing its
-#' identifiers or list columns as attributes. Numeric attributes are described
-#' with count-weighted statistics. Categorical and logical attributes report
-#' their number of observed values and missing records.
+#' @description Summarizes an \code{fsm_trip} object with expansion-factor
+#' weighted numeric statistics and categorical attribute diagnostics.
 #'
-#' @param object An \code{fsm_population} object.
+#' @param object An \code{fsm_trip} object.
 #' @param ... Unused.
 #'
-#' @return An object of class \code{summary.fsm_population} containing object
-#' metadata and tables for numeric and categorical attributes.
+#' @return An object of class \code{summary.fsm_trip}.
 #' @export
-summary.fsm_population <- function(object, ...) {
-  if (missing(object)) {
-    stop("`object` must be supplied.", call. = FALSE)
-  }
-  if (!inherits(object, "fsm_population")) {
-    stop("`object` must be an `fsm_population` object.", call. = FALSE)
-  }
-
-  attributes <- fsm_population_attribute_names(object)
-  numeric_attributes <- attributes[vapply(
-    object[, attributes, with = FALSE],
-    is.numeric,
-    logical(1)
-  )]
+summary.fsm_trip <- function(object, ...) {
+  if (missing(object)) stop("`object` must be supplied.", call. = FALSE)
+  if (!inherits(object, "fsm_trip")) stop("`object` must be an `fsm_trip` object.", call. = FALSE)
+  attributes <- fsm_trip_attribute_names(object)
+  numeric_attributes <- attributes[vapply(object[, attributes, with = FALSE], is.numeric, logical(1))]
   categorical_attributes <- setdiff(attributes, numeric_attributes)
-  categorical_attributes <- categorical_attributes[!vapply(
-    object[, categorical_attributes, with = FALSE],
-    is.list,
-    logical(1)
-  )]
-  weights <- object[["population_count"]]
-
-  numeric_statistics <- data.frame(
-    attribute = numeric_attributes,
-    mean = numeric(length(numeric_attributes)),
-    sd = numeric(length(numeric_attributes)),
-    min = numeric(length(numeric_attributes)),
-    max = numeric(length(numeric_attributes)),
-    missing = integer(length(numeric_attributes))
-  )
+  categorical_attributes <- categorical_attributes[!vapply(object[, categorical_attributes, with = FALSE], is.list, logical(1))]
+  weights <- fsm_trip_weights(object)
+  numeric <- data.frame(attribute = numeric_attributes, mean = NA_real_, sd = NA_real_, min = NA_real_, max = NA_real_, missing = 0L)
   for (index in seq_along(numeric_attributes)) {
     values <- object[[numeric_attributes[[index]]]]
     observed <- !is.na(values)
-    numeric_statistics$missing[[index]] <- sum(!observed)
-    if (!any(observed)) {
-      numeric_statistics[index, c("mean", "sd", "min", "max")] <- NA_real_
-      next
+    numeric$missing[[index]] <- sum(!observed)
+    observed_weight <- sum(weights[observed])
+    if (any(observed) && observed_weight > 0) {
+      numeric$mean[[index]] <- stats::weighted.mean(values[observed], weights[observed])
+      numeric$sd[[index]] <- sqrt(sum(weights[observed] * (values[observed] - numeric$mean[[index]])^2) / observed_weight)
+      numeric$min[[index]] <- min(values[observed])
+      numeric$max[[index]] <- max(values[observed])
     }
-    observed_weights <- weights[observed]
-    observed_values <- values[observed]
-    attribute_mean <- stats::weighted.mean(observed_values, observed_weights)
-    numeric_statistics$mean[[index]] <- attribute_mean
-    numeric_statistics$sd[[index]] <- sqrt(sum(
-      observed_weights * (observed_values - attribute_mean)^2
-    ) / sum(observed_weights))
-    numeric_statistics$min[[index]] <- min(observed_values)
-    numeric_statistics$max[[index]] <- max(observed_values)
   }
-
-  categorical_statistics <- data.frame(
-    attribute = categorical_attributes,
-    values = integer(length(categorical_attributes)),
-    missing = integer(length(categorical_attributes))
-  )
+  categorical <- data.frame(attribute = categorical_attributes, values = integer(length(categorical_attributes)), missing = integer(length(categorical_attributes)))
   for (index in seq_along(categorical_attributes)) {
     values <- object[[categorical_attributes[[index]]]]
-    observed <- !is.na(values)
-    categorical_statistics$values[[index]] <- length(unique(values[observed]))
-    categorical_statistics$missing[[index]] <- sum(!observed)
+    categorical$values[[index]] <- length(unique(values[!is.na(values)]))
+    categorical$missing[[index]] <- sum(is.na(values))
   }
-
-  out <- list(
-    rows = nrow(object),
-    represented_population = fsm_population_expanded_size(object),
-    sample_population = fsm_population_size(object),
-    represented_trips = if (all(c("origin", "destination") %in% names(object))) {
-      sum(weights)
-    } else {
-      NULL
-    },
-    n_attributes = length(attributes),
-    key = data.table::key(object),
-    numeric = numeric_statistics,
-    categorical = categorical_statistics
-  )
-  class(out) <- "summary.fsm_population"
-  out
+  structure(list(rows = nrow(object), trips = sum(weights), n_attributes = length(attributes), key = data.table::key(object), numeric = numeric, categorical = categorical), class = "summary.fsm_trip")
 }
 
-#' Print a Population Attribute Summary
+#' Print an Origin-Destination Survey Summary
 #'
-#' @param x A \code{summary.fsm_population} object.
+#' @param x A \code{summary.fsm_trip} object.
 #' @param ... Unused.
 #'
 #' @return Invisibly returns \code{x}.
 #' @export
-print.summary.fsm_population <- function(x, ...) {
-  if (missing(x)) {
-    stop("`x` must be supplied.", call. = FALSE)
-  }
-
-  cat("<summary.fsm_population>\n")
-  cat("  represented population: ", fsm_format_number(x$represented_population), "\n", sep = "")
-  if (x$represented_population != x$sample_population) {
-    cat("  sample population: ", fsm_format_number(x$sample_population), "\n", sep = "")
-  }
-  if (!is.null(x$represented_trips)) {
-    cat("  represented trips: ", fsm_format_number(x$represented_trips), "\n", sep = "")
-  }
+print.summary.fsm_trip <- function(x, ...) {
+  if (missing(x)) stop("`x` must be supplied.", call. = FALSE)
+  cat("<summary.fsm_trip>\n")
+  cat("  trips: ", fsm_format_number(x$trips), "\n", sep = "")
   cat("  rows: ", fsm_format_number(x$rows), "\n", sep = "")
   cat("  attributes: ", x$n_attributes, "\n", sep = "")
   cat("  key: ", paste(x$key, collapse = ", "), "\n", sep = "")
-
   cat("\nNumeric attributes\n")
-  if (nrow(x$numeric) == 0L) {
-    cat("  none\n")
-  } else {
-    print(x$numeric, row.names = FALSE, digits = 4)
-  }
-
+  if (nrow(x$numeric)) print(x$numeric, row.names = FALSE, digits = 4) else cat("  none\n")
   cat("\nCategorical attributes\n")
-  if (nrow(x$categorical) == 0L) {
-    cat("  none\n")
-  } else {
-    print(x$categorical, row.names = FALSE)
-  }
+  if (nrow(x$categorical)) print(x$categorical, row.names = FALSE) else cat("  none\n")
   invisible(x)
 }
 
@@ -639,7 +497,7 @@ fsm_generation_unit <- function(id_col, data_names = character()) {
   if (identical(id_col, "zone_id")) {
     return("zone")
   }
-  if (all(c("origin", "destination") %in% data_names)) "trip" else "population record"
+  if (all(c("origin", "destination") %in% data_names)) "trip" else "trip record"
 }
 
 #' Summarize a Generation Model

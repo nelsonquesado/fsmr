@@ -391,30 +391,30 @@ test_that("growth factors support optional data and totals", {
   )
 })
 
-test_that("generation regression supports population-level identifiers", {
-  population_totals <- data.frame(
-    population_id = fsm_toy_population$population_id,
-    production = fsm_toy_population$population_count *
-      (1 + fsm_toy_population$employed + fsm_toy_population$vehicles),
-    attraction = fsm_toy_population$population_count *
-      (2 + 2 * fsm_toy_population$employed + fsm_toy_population$vehicles)
+test_that("generation regression supports trip-level identifiers", {
+  trip_totals <- data.frame(
+    trip_id = fsm_toy_trip$trip_id,
+    production = fsm_toy_trip$expansion_factor *
+      (1 + fsm_toy_trip$employed + fsm_toy_trip$vehicles),
+    attraction = fsm_toy_trip$expansion_factor *
+      (2 + 2 * fsm_toy_trip$employed + fsm_toy_trip$vehicles)
   )
 
   fit <- fsm_generation(
-    fsm_toy_population,
-    population_totals,
+    fsm_toy_trip,
+    trip_totals,
     method = "regression",
-    production_formula = production ~ 0 + population_count +
-      population_count:employed + population_count:vehicles,
-    attraction_formula = attraction ~ 0 + population_count +
-      population_count:employed + population_count:vehicles
+    production_formula = production ~ 0 + expansion_factor +
+      expansion_factor:employed + expansion_factor:vehicles,
+    attraction_formula = attraction ~ 0 + expansion_factor +
+      expansion_factor:employed + expansion_factor:vehicles
   )
-  pred <- predict(fit, fsm_toy_population)
+  pred <- predict(fit, fsm_toy_trip)
 
-  expect_identical(fit$id_col, "population_id")
+  expect_identical(fit$id_col, "trip_id")
   expect_identical(summary(fit)$unit, "trip")
-  expect_identical(names(pred), c("population_id", "production", "attraction"))
-  expect_identical(data.table::key(pred), "population_id")
+  expect_identical(names(pred), c("trip_id", "production", "attraction"))
+  expect_identical(data.table::key(pred), "trip_id")
 })
 
 test_that("generation validates totals and custom prediction output", {

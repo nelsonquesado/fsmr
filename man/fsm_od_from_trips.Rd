@@ -14,7 +14,7 @@ fsm_od_from_trips(
 )
 }
 \arguments{
-\item{data}{A data.frame, data.table, list, or \code{fsm_population}
+\item{data}{A data.frame, data.table, list, or \code{fsm_trip}
 containing trip records.}
 
 \item{origins}{Character string naming the origin-zone column.}
@@ -22,8 +22,8 @@ containing trip records.}
 \item{destinations}{Character string naming the destination-zone column.}
 
 \item{weights}{Optional character string naming a finite, non-negative
-numeric trip-weight column. For an \code{fsm_population}, the default uses
-\code{population_count}; for other inputs, each row has weight one.}
+numeric trip-weight column. For an \code{fsm_trip}, the default uses
+\code{expansion_factor} when present; otherwise each row has weight one.}
 
 \item{modes}{Optional vector of mode values to retain before aggregation.
 A value matches either a complete mode-chain label or any component of a
@@ -48,8 +48,8 @@ Person identifiers may link records, but this aggregation does not model
 dependencies among trips in a chain.
 }
 \examples{
-od <- fsm_od_from_trips(fsm_toy_population)
-car_od <- fsm_od_from_trips(fsm_toy_population, modes = "car")
+od <- fsm_od_from_trips(fsm_toy_trip)
+car_od <- fsm_od_from_trips(fsm_toy_trip, modes = "car")
 }
 \references{
 Cascetta, E. (2009). \emph{Transportation Systems Analysis: Models and

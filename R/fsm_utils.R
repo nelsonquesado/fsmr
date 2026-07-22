@@ -5,24 +5,24 @@ fsm_is_single_string <- function(x) {
 
 # Resolve the observational unit used by generation models.
 fsm_generation_id <- function(data, argument = "data") {
-  if (inherits(data, "fsm_population") && "population_id" %in% names(data)) {
-    id_columns <- "population_id"
+  if (inherits(data, "fsm_trip") && "trip_id" %in% names(data)) {
+    id_columns <- "trip_id"
   } else if (inherits(data, "fsm_zone") && "zone_id" %in% names(data)) {
     id_columns <- "zone_id"
   } else {
-    id_columns <- intersect(c("zone_id", "population_id"), names(data))
+    id_columns <- intersect(c("zone_id", "trip_id"), names(data))
   }
 
   if (length(id_columns) == 0L) {
     stop(
-      "`", argument, "` must contain either `zone_id` or `population_id`.",
+      "`", argument, "` must contain either `zone_id` or `trip_id`.",
       call. = FALSE
     )
   }
 
   if (length(id_columns) > 1L) {
     stop(
-      "`", argument, "` cannot contain both `zone_id` and `population_id`.",
+      "`", argument, "` cannot contain both `zone_id` and `trip_id`.",
       call. = FALSE
     )
   }

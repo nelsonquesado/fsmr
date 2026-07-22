@@ -64,16 +64,16 @@ plot(zones)
 Supplying `od` validates that its origin and destination identifiers are known
 zones. It does not require every zone to have observed trips.
 
-## Disaggregate Population and Trip Data
+## Origin-Destination Survey Trips
 
-`fsm_population()` stores one disaggregate record per row. A record can be an
-individual or a trip carrying individual attributes. `population_count`
-represents multiple records only when every stored attribute is identical.
+`fsm_trip()` stores one observed origin-destination survey trip per row.
+Traveler and trip attributes retain their original names. An optional
+`expansion_factor` represents the number of trips represented by a record.
 
-```{r population}
-population_data <- data.frame(
+```{r trips}
+trip_data <- data.frame(
   id = 1:3,
-  people = c(2, 1, 3),
+  factor = c(1.2, 0.8, 1.5),
   income = c(1800, 2400, 0),
   employed = c(TRUE, TRUE, FALSE),
   student = c(FALSE, TRUE, FALSE),
@@ -85,38 +85,37 @@ population_data <- data.frame(
   time_of_day = c("07:30:00", "17:15:00", "12:00:00")
 )
 
-population <- fsm_population(
-  population_data,
-  population_id = "id",
-  population_count = "people"
+trips <- fsm_trip(
+  trip_data,
+  trip_id = "id",
+  expansion_factor = "factor"
 )
-population
-summary(population)
+trips
+summary(trips)
 ```
 
-`fsm_toy_population` uses trips as its observational unit. It keeps a
-list-column of individual identifiers when otherwise identical trip records
-are grouped. `home_zone` and `person_weight` link its sampled people to the
-resident population in `fsm_toy_zone`; `population_count` remains the trip
-weight that reproduces the positive-demand toy OD flows. Its trip attributes
-include endpoints, mode, an ordered purpose pair, and a 24-hour clock time.
+`fsm_toy_trip` contains one trip per row. Its `expansion_factor` is one for
+every record, so its positive-demand trips reproduce `fsm_toy_od`. It includes
+individual attributes such as age, gender, varied `income_pc`, employment,
+student status, and vehicle availability, alongside endpoints, mode, an
+ordered purpose pair, and a 24-hour clock time.
 
-```{r toy-population, fig.width = 12, fig.height = 14}
-fsm_toy_population
-plot(fsm_toy_population)
+```{r toy-trips, fig.width = 12, fig.height = 14}
+fsm_toy_trip
+plot(fsm_toy_trip)
 ```
 
 ## Aggregating Trip Records
 
-Use the trip helpers to derive aggregate objects. For an `fsm_population`,
-`population_count` is used as the default trip weight.
+Use the trip helpers to derive aggregate objects. For an `fsm_trip`,
+`expansion_factor` is the default trip weight when it is present.
 
 ```{r trip-helpers}
-trip_od <- fsm_od_from_trips(fsm_toy_population)
-transit_od <- fsm_od_from_trips(fsm_toy_population, modes = "transit")
-trip_zones <- fsm_zone_from_trips(fsm_toy_population, include = 7L)
+trip_od <- fsm_od_from_trips(fsm_toy_trip)
+transit_od <- fsm_od_from_trips(fsm_toy_trip, modes = "transit")
+trip_zones <- fsm_zone_from_trips(fsm_toy_trip, include = 7L)
 trip_totals <- fsm_od_totals_from_trips(
-  fsm_toy_population,
+  fsm_toy_trip,
   zones = trip_zones
 )
 

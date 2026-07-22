@@ -15,7 +15,7 @@ fsm_od_totals_from_trips(
 )
 }
 \arguments{
-\item{data}{A data.frame, data.table, list, or \code{fsm_population}
+\item{data}{A data.frame, data.table, list, or \code{fsm_trip}
 containing trip records.}
 
 \item{origins}{Character string naming the origin-zone column.}
@@ -23,8 +23,8 @@ containing trip records.}
 \item{destinations}{Character string naming the destination-zone column.}
 
 \item{weights}{Optional character string naming a finite, non-negative
-numeric trip-weight column. For an \code{fsm_population}, the default uses
-\code{population_count}; for other inputs, each row has weight one.}
+numeric trip-weight column. For an \code{fsm_trip}, the default uses
+\code{expansion_factor} when present; otherwise each row has weight one.}
 
 \item{modes}{Optional vector of mode values to retain before aggregation.
 A value matches either a complete mode-chain label or any component of a
@@ -47,5 +47,5 @@ computes productions and attractions. Supplying \code{zones} includes known
 zones with no observed trips and validates trip-zone coverage.
 }
 \examples{
-fsm_od_totals_from_trips(fsm_toy_population, zones = fsm_toy_zone)
+fsm_od_totals_from_trips(fsm_toy_trip, zones = fsm_toy_zone)
 }

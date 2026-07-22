@@ -21,7 +21,7 @@ fsm_generation(
 )
 }
 \arguments{
-\item{data}{Optional \code{fsm_zone}, \code{fsm_population}, or
+\item{data}{Optional \code{fsm_zone}, \code{fsm_trip}, or
 data.frame-like table containing explanatory variables. It may be omitted
 for \code{method = "growth_factor"} or when an already calibrated
 \code{custom_object} is supplied.}
@@ -80,23 +80,21 @@ function.}
 }
 \value{
 An object of class \code{fsm_generation}. It can be passed to
-\code{predict()} with new zonal, population-level, or trip-level data. Regression
+\code{predict()} with new zonal or trip-level data. Regression
 predictions contain only the outcomes whose formulas were supplied.
 }
 \description{
-Fits a trip-generation model that can be applied to new zonal,
-population-level, or trip-level data. Built-in methods include regression,
+Fits a trip-generation model that can be applied to new zonal
+or trip-level data. Built-in methods include regression,
 cross-classification rates, and growth factors. A custom fitting function or
 an already fitted object can also be supplied for full control over
 estimation and prediction. The current implementation is trip-based and
 does not jointly model decisions across trip chains or activity schedules.
 When supplied, input data must be uniquely
-identified by either \code{zone_id} or \code{population_id}.
-An \code{fsm_population} may also carry a non-unique \code{zone_id} attribute
-for zonal aggregation; it is not required for fitting, and
-\code{population_id} remains the modeling identifier. A zone column or
-separate correspondence is needed only when population-level predictions
-are later aggregated into zonal productions and attractions.
+identified by either \code{zone_id} or \code{trip_id}.
+For trip-level data, \code{trip_id} remains the modeling identifier.
+Trip-level predictions can be aggregated into zonal productions and
+attractions with their origin and destination columns.
 For regression, production and attraction models are optional and fitted
 independently, but at least one formula must be supplied. Regression
 predictions are rounded to whole trips. Negative predictions are replaced

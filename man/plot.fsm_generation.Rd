@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{An \code{fsm_generation} object.}
 
-\item{newdata}{Optional zonal, population-level, or trip-level data used to generate
+\item{newdata}{Optional zonal or trip-level data used to generate
 predictions. If omitted, the training data stored in \code{x} are used.}
 
 \item{negative}{Character string controlling negative predictions. See
@@ -23,7 +23,7 @@ Invisibly returns the prediction data.table used for plotting.
 \description{
 Plots the available production and attraction predictions from
 a fitted \code{fsm_generation} object against its stored training data or
-new zonal, population-level, or trip-level data.
+new zonal or trip-level data.
 }
 \examples{
 zones <- fsm_toy_zone

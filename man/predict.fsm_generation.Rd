@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{An \code{fsm_generation} object.}
 
-\item{newdata}{Optional zonal, population-level, or trip-level data used for prediction.
+\item{newdata}{Optional zonal or trip-level data used for prediction.
 It must use the same identifier type as the fitted model. If omitted, the
 training data stored in \code{object} are used.}
 
@@ -22,7 +22,7 @@ outcome, record identifier, and original value.}
 }
 \value{
 A keyed \code{data.table} with \code{zone_id} or
-\code{population_id}, plus the modeled outcome columns. Regression returns
+\code{trip_id}, plus the modeled outcome columns. Regression returns
 only the outcomes whose formulas were supplied. All observed predicted
 outcomes are rounded to whole trips. Predictions that cannot be calculated
 because of missing inputs are retained as \code{NA} with a warning. By
