@@ -212,7 +212,6 @@ print.fsm_trip <- function(x, ..., n = 6L) {
   if (missing(x)) stop("`x` must be supplied.", call. = FALSE)
   cat("<fsm_trip>\n")
   cat("  trips: ", fsm_format_number(sum(fsm_trip_weights(x))), "\n", sep = "")
-  cat("  rows: ", fsm_format_number(nrow(x)), "\n", sep = "")
   if ("individual_id" %in% names(x) && !anyNA(x[["individual_id"]])) {
     cat("  individuals: ", fsm_format_number(length(unique(x[["individual_id"]]))), "\n", sep = "")
   }
@@ -234,7 +233,8 @@ fsm_trip_attribute_names <- function(x) {
 #' Summarize an Origin-Destination Survey Object
 #'
 #' @description Summarizes an \code{fsm_trip} object with expansion-factor
-#' weighted numeric statistics and categorical attribute diagnostics.
+#' weighted numeric statistics and categorical attribute frequencies. Clock-time
+#' strings are omitted from the categorical frequency table.
 #'
 #' @param object An \code{fsm_trip} object.
 #' @param ... Unused.
@@ -248,6 +248,15 @@ summary.fsm_trip <- function(object, ...) {
   numeric_attributes <- attributes[vapply(object[, attributes, with = FALSE], is.numeric, logical(1))]
   categorical_attributes <- setdiff(attributes, numeric_attributes)
   categorical_attributes <- categorical_attributes[!vapply(object[, categorical_attributes, with = FALSE], is.list, logical(1))]
+  clock_time <- vapply(categorical_attributes, function(attribute) {
+    values <- object[[attribute]]
+    observed <- values[!is.na(values)]
+    is.character(values) && length(observed) && all(grepl(
+      "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$",
+      observed
+    ))
+  }, logical(1))
+  categorical_attributes <- categorical_attributes[!clock_time]
   weights <- fsm_trip_weights(object)
   numeric <- data.frame(attribute = numeric_attributes, mean = NA_real_, sd = NA_real_, min = NA_real_, max = NA_real_, missing = 0L)
   for (index in seq_along(numeric_attributes)) {
@@ -263,12 +272,26 @@ summary.fsm_trip <- function(object, ...) {
     }
   }
   categorical <- data.frame(attribute = categorical_attributes, values = integer(length(categorical_attributes)), missing = integer(length(categorical_attributes)))
+  categorical_levels <- list()
   for (index in seq_along(categorical_attributes)) {
     values <- object[[categorical_attributes[[index]]]]
     categorical$values[[index]] <- length(unique(values[!is.na(values)]))
     categorical$missing[[index]] <- sum(is.na(values))
+    labels <- ifelse(is.na(values), "Missing", as.character(values))
+    frequencies <- tapply(weights, labels, sum)
+    categorical_levels[[index]] <- data.frame(
+      attribute = categorical_attributes[[index]],
+      value = names(frequencies),
+      trips = as.numeric(frequencies),
+      row.names = NULL
+    )
   }
-  structure(list(rows = nrow(object), trips = sum(weights), n_attributes = length(attributes), key = data.table::key(object), numeric = numeric, categorical = categorical), class = "summary.fsm_trip")
+  categorical_levels <- if (length(categorical_levels)) {
+    do.call(rbind, categorical_levels)
+  } else {
+    data.frame(attribute = character(), value = character(), trips = numeric())
+  }
+  structure(list(rows = nrow(object), trips = sum(weights), n_attributes = length(attributes), key = data.table::key(object), numeric = numeric, categorical = categorical, categorical_levels = categorical_levels), class = "summary.fsm_trip")
 }
 
 #' Print an Origin-Destination Survey Summary
@@ -289,6 +312,12 @@ print.summary.fsm_trip <- function(x, ...) {
   if (nrow(x$numeric)) print(x$numeric, row.names = FALSE, digits = 4) else cat("  none\n")
   cat("\nCategorical attributes\n")
   if (nrow(x$categorical)) print(x$categorical, row.names = FALSE) else cat("  none\n")
+  cat("\nCategorical values\n")
+  if (nrow(x$categorical_levels)) {
+    print(x$categorical_levels, row.names = FALSE)
+  } else {
+    cat("  none\n")
+  }
   invisible(x)
 }
 

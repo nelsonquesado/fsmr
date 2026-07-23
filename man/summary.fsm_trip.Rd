@@ -16,5 +16,6 @@ An object of class \code{summary.fsm_trip}.
 }
 \description{
 Summarizes an \code{fsm_trip} object with expansion-factor
-weighted numeric statistics and categorical attribute diagnostics.
+weighted numeric statistics and categorical attribute frequencies. Clock-time
+strings are omitted from the categorical frequency table.
 }

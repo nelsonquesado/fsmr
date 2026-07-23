@@ -89,10 +89,12 @@ data.table::setattr(fsm_toy_zone, "class", c("fsm_zone", class(fsm_toy_zone)))
 #'
 #' @description A deterministic disaggregate trip table aligned with the
 #' positive-demand records in \code{fsm_toy_od}. Each row represents one trip
-#' in an origin-destination survey. The toy contains a sample of 7,145 people
-#' making 14,290 trips: individuals make one, two, or three trips, with
-#' an average of two trips per person. \code{expansion_factor} is the trip
-#' expansion factor and is one throughout, so the records reproduce the
+#' in an origin-destination survey. The toy contains a sample of approximately
+#' 6,000 people making 14,290 trips, with an average of about 2.4 trips per
+#' person. Consecutive trips made by the same
+#' individual form a continuous origin-destination chain.
+#' \code{expansion_factor} is the trip expansion factor and is one throughout,
+#' so the records reproduce the
 #' positive-demand OD flows. The sample is
 #' approximately 54 percent female and has an approximately
 #' 35 percent vehicle-ownership share. Per-capita income varies across
@@ -137,22 +139,163 @@ data.table::setattr(fsm_toy_zone, "class", c("fsm_zone", class(fsm_toy_zone)))
 #' activities at the origin and destination.
 fsm_toy_trip <- local({
   positive_od <- fsm_toy_od[!is.na(demand) & demand > 0]
-  origin <- rep(positive_od[["origin"]], times = as.integer(positive_od[["demand"]]))
-  destination <- rep(
+  observed_origin <- rep(
+    positive_od[["origin"]],
+    times = as.integer(positive_od[["demand"]])
+  )
+  observed_destination <- rep(
     positive_od[["destination"]],
     times = as.integer(positive_od[["demand"]])
   )
-  n_trips <- length(origin)
-  n_people <- n_trips %/% 2L
-  one_or_three <- (n_people - 1L) %/% 4L
-  person_daily_trips <- c(
-    rep(1L, one_or_three),
-    rep(2L, n_people - 2L * one_or_three),
-    rep(3L, one_or_three)
-  )
-  person_id <- rep(seq_len(n_people), times = person_daily_trips)
-  trip_number <- sequence(person_daily_trips)
-  daily_trips <- person_daily_trips[person_id]
+  n_trips <- length(observed_origin)
+
+  # Add balancing arcs, then split Euler trails at those arcs. The resulting
+  # observed arcs preserve the OD matrix while remaining continuous per person.
+  nodes <- sort(unique(c(observed_origin, observed_destination)))
+  outflow <- tabulate(match(observed_origin, nodes), nbins = length(nodes))
+  inflow <- tabulate(match(observed_destination, nodes), nbins = length(nodes))
+  imbalance <- outflow - inflow
+  surplus <- rep(nodes[imbalance > 0L], times = imbalance[imbalance > 0L])
+  deficit <- rep(nodes[imbalance < 0L], times = -imbalance[imbalance < 0L])
+  virtual_origin <- deficit
+  virtual_destination <- surplus
+
+  edge_origin <- c(observed_origin, virtual_origin)
+  edge_destination <- c(observed_destination, virtual_destination)
+  is_virtual <- c(rep(FALSE, n_trips), rep(TRUE, length(virtual_origin)))
+  outgoing <- split(seq_along(edge_origin), as.character(edge_origin))
+  cursor <- stats::setNames(integer(length(outgoing)), names(outgoing))
+  used <- rep(FALSE, length(edge_origin))
+  circuits <- list()
+
+  while (any(!used)) {
+    start <- edge_origin[[which(!used)[[1L]]]]
+    stack_nodes <- start
+    stack_edges <- integer()
+    circuit <- integer()
+
+    while (length(stack_nodes)) {
+      node <- stack_nodes[[length(stack_nodes)]]
+      node_name <- as.character(node)
+      candidates <- outgoing[[node_name]]
+      position <- cursor[[node_name]] + 1L
+      while (position <= length(candidates) && used[[candidates[[position]]]]) {
+        position <- position + 1L
+      }
+      cursor[[node_name]] <- position
+
+      if (position <= length(candidates)) {
+        edge <- candidates[[position]]
+        used[[edge]] <- TRUE
+        stack_nodes <- c(stack_nodes, edge_destination[[edge]])
+        stack_edges <- c(stack_edges, edge)
+      } else {
+        stack_nodes <- stack_nodes[-length(stack_nodes)]
+        if (length(stack_edges)) {
+          circuit <- c(circuit, stack_edges[[length(stack_edges)]])
+          stack_edges <- stack_edges[-length(stack_edges)]
+        }
+      }
+    }
+    circuits[[length(circuits) + 1L]] <- rev(circuit)
+  }
+
+  trails <- list()
+  for (circuit in circuits) {
+    virtual_positions <- which(is_virtual[circuit])
+    first_virtual <- if (length(virtual_positions)) virtual_positions[[1L]] else NA_integer_
+    if (!is.na(first_virtual) && first_virtual < length(circuit)) {
+      circuit <- c(circuit[(first_virtual + 1L):length(circuit)], circuit[seq_len(first_virtual)])
+    }
+    trail <- integer()
+    for (edge in circuit) {
+      if (is_virtual[[edge]]) {
+        if (length(trail)) trails[[length(trails) + 1L]] <- trail
+        trail <- integer()
+      } else {
+        trail <- c(trail, edge)
+      }
+    }
+    if (length(trail)) trails[[length(trails) + 1L]] <- trail
+  }
+
+  # Join compatible one-leg fragments before splitting trails into daily chains.
+  repeat {
+    one_leg <- which(lengths(trails) == 1L)
+    merged <- FALSE
+    for (trail_index in one_leg) {
+      fragment <- trails[[trail_index]]
+      if (!length(fragment)) next
+
+      starts <- vapply(trails, function(trail) {
+        if (length(trail)) edge_origin[[trail[[1L]]]] else NA_integer_
+      }, integer(1))
+      ends <- vapply(trails, function(trail) {
+        if (length(trail)) edge_destination[[trail[[length(trail)]]]] else NA_integer_
+      }, integer(1))
+
+      append_to <- setdiff(which(ends == edge_origin[[fragment[[1L]]]]), trail_index)
+      prepend_to <- setdiff(which(starts == edge_destination[[fragment[[1L]]]]), trail_index)
+      candidates <- c(append_to, prepend_to)
+      if (!length(candidates)) next
+
+      candidate <- candidates[[1L]]
+      if (candidate %in% append_to) {
+        trails[[candidate]] <- c(trails[[candidate]], fragment)
+      } else {
+        trails[[candidate]] <- c(fragment, trails[[candidate]])
+      }
+      trails[[trail_index]] <- integer()
+      merged <- TRUE
+    }
+    trails <- Filter(length, trails)
+    if (!merged) break
+  }
+
+  trail_lengths <- lengths(trails)
+  minimum_chunks <- ifelse(trail_lengths == 1L, 1L, ceiling(trail_lengths / 3))
+  maximum_chunks <- ifelse(trail_lengths == 1L, 1L, floor(trail_lengths / 2))
+  target_people <- max(ceiling(n_trips / 2.5), sum(minimum_chunks))
+  if (target_people > sum(maximum_chunks)) {
+    stop("Toy trip chains cannot be divided to a feasible average length.", call. = FALSE)
+  }
+  n_chunks <- minimum_chunks
+  remaining_chunks <- target_people - sum(n_chunks)
+  for (trail_index in seq_along(trails)) {
+    add <- min(remaining_chunks, maximum_chunks[[trail_index]] - n_chunks[[trail_index]])
+    n_chunks[[trail_index]] <- n_chunks[[trail_index]] + add
+    remaining_chunks <- remaining_chunks - add
+  }
+
+  chain_edges <- list()
+  chain_sizes <- integer()
+  for (trail_index in seq_along(trails)) {
+    trail_length <- trail_lengths[[trail_index]]
+    n_chain <- n_chunks[[trail_index]]
+    sizes <- if (trail_length == 1L) {
+      1L
+    } else {
+      c(
+        rep.int(3L, trail_length - 2L * n_chain),
+        rep.int(2L, 3L * n_chain - trail_length)
+      )
+    }
+    position <- 0L
+    for (size in sizes) {
+      chain_edges[[length(chain_edges) + 1L]] <-
+        trails[[trail_index]][position + seq_len(size)]
+      chain_sizes <- c(chain_sizes, size)
+      position <- position + size
+    }
+  }
+
+  trip_edges <- unlist(chain_edges, use.names = FALSE)
+  origin <- edge_origin[trip_edges]
+  destination <- edge_destination[trip_edges]
+  n_people <- length(chain_edges)
+  person_id <- rep(seq_len(n_people), times = chain_sizes)
+  trip_number <- unlist(lapply(chain_sizes, seq_len), use.names = FALSE)
+  daily_trips <- rep(chain_sizes, times = chain_sizes)
 
   person_age <- 18L + as.integer((seq_len(n_people) * 7L) %% 65L)
   person_gender <- rep("male", n_people)

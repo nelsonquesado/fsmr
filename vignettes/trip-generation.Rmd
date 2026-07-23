@@ -175,11 +175,9 @@ predict(external_fit, zones)
 
 ## Trip-Level Records
 
-Trip-level generation uses `trip_id` as the record identifier. The toy survey
-includes varied individual attributes, including `income_pc`, and
-`expansion_factor` acts as the trip weight. This record-level example shows
-the supported interface; zonal production and attraction models remain the
-usual application of trip generation.
+Trip-level generation uses `trip_id` as the record identifier. This example
+demonstrates the supported record-level interface; zonal production and
+attraction models remain the usual application of trip generation.
 
 ```{r trip-level}
 trip_totals <- data.frame(

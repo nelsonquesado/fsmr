@@ -23,14 +23,24 @@ test_that("fsm_toy_trip contains one origin-destination survey trip per row", {
   expect_identical(fsm_toy_trip$trip_id, seq_len(14290L))
   expect_true(all(fsm_toy_trip$expansion_factor == 1))
   expect_false("zone_id" %in% names(fsm_toy_trip))
-  expect_setequal(unique(fsm_toy_trip$individual_id), seq_len(7145L))
   individuals <- fsm_toy_trip[!duplicated(individual_id)]
-  expect_equal(mean(individuals$daily_trips), 2)
+  expect_gt(mean(individuals$daily_trips), 2.3)
+  expect_lt(mean(individuals$daily_trips), 2.5)
   expect_equal(mean(individuals$income_pc), 1800)
   expect_equal(range(fsm_toy_trip$income_pc), c(0, 4000))
   expect_gt(length(unique(individuals$income_pc)), 1000L)
-  expect_equal(mean(individuals$vehicles), round(0.35 * 7145) / 7145)
-  expect_equal(mean(individuals$gender == "female"), round(0.54 * 7145) / 7145)
+  expect_equal(
+    mean(individuals$vehicles),
+    round(0.35 * nrow(individuals)) / nrow(individuals)
+  )
+  expect_equal(
+    mean(individuals$gender == "female"),
+    round(0.54 * nrow(individuals)) / nrow(individuals)
+  )
+  continuity <- fsm_toy_trip[, {
+    all(destination[-.N] == origin[-1L])
+  }, by = individual_id][["V1"]]
+  expect_true(all(continuity))
 })
 
 test_that("fsm_trip inspection uses expansion factors", {
@@ -38,8 +48,10 @@ test_that("fsm_trip inspection uses expansion factors", {
   trip_summary <- summary(fsm_toy_trip)
 
   expect_true(any(grepl("trips: 14,290", output, fixed = TRUE)))
+  expect_false(any(grepl("rows:", output, fixed = TRUE)))
   expect_s3_class(trip_summary, "summary.fsm_trip")
   expect_equal(trip_summary$trips, 14290)
+  expect_true(nrow(trip_summary$categorical_levels) > 0)
   expect_false("individual_id" %in% trip_summary$numeric$attribute)
   expect_identical(plot(fsm_toy_trip), fsm_toy_trip)
 })

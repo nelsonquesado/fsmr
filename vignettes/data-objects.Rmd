@@ -12,9 +12,8 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 library(fsmr)
 ```
 
-`fsmr` represents the aggregate and disaggregate inputs used in a trip-based
-four-step workflow. It currently treats each origin-destination trip as an
-independent choice unit.
+`fsmr` represents aggregate OD demand, zone attributes, and observed
+origin-destination survey trips for a trip-based four-step workflow.
 
 ## Origin-Destination Demand
 
@@ -94,11 +93,9 @@ trips
 summary(trips)
 ```
 
-`fsm_toy_trip` contains one trip per row. Its `expansion_factor` is one for
-every record, so its positive-demand trips reproduce `fsm_toy_od`. It includes
-individual attributes such as age, gender, varied `income_pc`, employment,
-student status, and vehicle availability, alongside endpoints, mode, an
-ordered purpose pair, and a 24-hour clock time.
+`fsm_toy_trip` uses unit expansion factors and reproduces the positive-demand
+records in `fsm_toy_od`. Its individuals make continuous trip chains, averaging
+about 2.4 trips each.
 
 ```{r toy-trips, fig.width = 12, fig.height = 14}
 fsm_toy_trip

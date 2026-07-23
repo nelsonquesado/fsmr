@@ -34,10 +34,12 @@ fsm_toy_trip
 \description{
 A deterministic disaggregate trip table aligned with the
 positive-demand records in \code{fsm_toy_od}. Each row represents one trip
-in an origin-destination survey. The toy contains a sample of 7,145 people
-making 14,290 trips: individuals make one, two, or three trips, with
-an average of two trips per person. \code{expansion_factor} is the trip
-expansion factor and is one throughout, so the records reproduce the
+in an origin-destination survey. The toy contains a sample of approximately
+6,000 people making 14,290 trips, with an average of about 2.4 trips per
+person. Consecutive trips made by the same
+individual form a continuous origin-destination chain.
+\code{expansion_factor} is the trip expansion factor and is one throughout,
+so the records reproduce the
 positive-demand OD flows. The sample is
 approximately 54 percent female and has an approximately
 35 percent vehicle-ownership share. Per-capita income varies across
